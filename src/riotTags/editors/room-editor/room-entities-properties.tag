@@ -416,6 +416,7 @@ room-entities-properties
             'updateTransform'
         ];
 
+        // eslint-disable-next-line complexity
         this.applyChanges = () => {
             if (this.firstRun) {
                 return;
@@ -439,6 +440,14 @@ room-entities-properties
                         }
                         break;
                     case 'color':
+                        (
+                            entity.sprite ||
+                            entity.nineSlicePlane ||
+                            entity.text ||
+                            entity
+                        )[property] = value ?? 0xffffff;
+                        entity[property] = value;
+                        break;
                     case 'slider':
                         entity[property] = value;
                         break;
@@ -449,9 +458,8 @@ room-entities-properties
                     }
                 }
                 // Copies with NineSlicePlanes should rescale their innards
-                if (entity.nineSlicePlane) {
-                    entity.updateNinePatch();
-                }
+                entity.rescale?.();
+
                 // Extensions and custom properties are supported for copies only
                 if (!(entity instanceof Copy)) {
                     continue;

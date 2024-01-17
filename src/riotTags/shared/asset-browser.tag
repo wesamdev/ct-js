@@ -358,7 +358,7 @@ asset-browser.flexfix(class="{opts.namespace} {opts.class} {compact: opts.compac
                 } else {
                     this.entries.sort((a, b) =>
                         this.sortFolderwise(a, b) ||
-                        a.name.localeCompare(b.name) ||
+                        (a.name ?? a.typefaceName).localeCompare(b.name ?? b.typefaceName) ||
                         this.sortTypewise(a, b));
                 }
             } else if (this.sort === 'type') {
@@ -372,7 +372,7 @@ asset-browser.flexfix(class="{opts.namespace} {opts.class} {compact: opts.compac
                     this.entries.sort((a, b) =>
                         this.sortFolderwise(a, b) ||
                         this.sortTypewise(a, b) ||
-                        a.name.localeCompare(b.name));
+                        (a.name ?? a.typefaceName).localeCompare(b.name ?? b.typefaceName));
                 }
             } else {
                 this.entries.sort((a, b) =>
@@ -522,6 +522,9 @@ asset-browser.flexfix(class="{opts.namespace} {opts.class} {compact: opts.compac
                     .prompt(this.vocGlob.newName);
                 if (reply.inputValue && reply.inputValue.trim() !== '' && reply.buttonClicked !== 'cancel') {
                     this.contextMenuAsset.name = reply.inputValue.trim();
+                    window.orders.trigger('renameAsset', [this.contextMenuAsset.uid, this.contextMenuAsset.name]);
+                    window.signals.trigger('assetChanged', this.contextMenuAsset);
+                    window.signals.trigger(`${this.contextMenuAsset.type}Changed`, this.contextMenuAsset);
                     this.update();
                 }
             }

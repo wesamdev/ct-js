@@ -90,6 +90,7 @@ app/Screenshot of *.png
 app/export.zip
 app/export
 *.ict.recovery
+*.ict.backup*
 
 # editor-specific
 .vscode/settings.json
@@ -113,3 +114,4 @@ app/data/ct.libs/gamedistribution/.vscode/settings.json
 # neutralino binaries
 src/ct.release/desktopPack/bin
 src/ct.release/desktopPack/game/neutralino.js
+app/data/ct.shared/ctSound.js

@@ -1,5 +1,6 @@
 const defaultProjectTemplate: IProject = {
     ctjsVersion: process.versions.ctjs,
+    backups: 3,
     language: 'typescript',
     notes: '/* empty */',
     libs: {
@@ -9,7 +10,8 @@ const defaultProjectTemplate: IProject = {
         },
         pointer: {},
         keyboard: {},
-        'keyboard.polyfill': {}
+        'keyboard.polyfill': {},
+        'pointer.polyfill': {}
     },
     startroom: -1,
     contentTypes: [],

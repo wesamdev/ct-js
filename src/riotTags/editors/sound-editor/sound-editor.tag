@@ -45,12 +45,24 @@ sound-editor.aView.pad.flexfix(onclick="{tryClose}")
                                 use(xlink:href="#folder-plus")
                             span  {voc.addVariant}
                         input(type="file" ref="inputsound" accept=".mp3,.ogg,.wav" onchange="{importVariant}")
-            .flexfix-footer
-                h2.nmt {vocGlob.settings}
-                .aSpacer
-                label.checkbox
-                    input(type="checkbox")
-                    b {voc.preload}
+            .flexfix-footer.flexrow
+                div
+                    h2.nmt
+                        span {voc.positionalAudio}
+                        hover-hint(text="{voc.positionalAudioHint}")
+                    dl.nm.flexrow
+                        dt {voc.falloff}
+                        dd
+                            input.short.inline(type="number" min="0" value="{asset.panning.rolloffFactor}" onchange="{wire('asset.panning.rolloffFactor')}")
+                        dt {voc.refDistance}
+                        dd
+                            input.short.inline(type="number" min="0" value="{asset.panning.refDistance}" onchange="{wire('asset.panning.refDistance')}")
+                .aSpacer.nogrow.noshrink
+                div
+                    h2.nmt {vocGlob.settings}
+                    label.checkbox
+                        input(type="checkbox" checked="{asset.preload}" onchange="{wire('asset.preload')}")
+                        b {voc.preload}
         .fifty.npr.flexfix.tall
             .flexfix-header
                 h2.nmt {voc.effects}
@@ -224,11 +236,7 @@ sound-editor.aView.pad.flexfix(onclick="{tryClose}")
             if (!this.asset.lastmod && this.asset.name === 'New Sound') {
                 this.asset.name = path.basename(source, path.extname(source));
             }
-            const variant = await sounds.addSoundFile(this.asset, source);
-            this.smallWaveforms[variant.uid] =
-                SoundPreviewer.get(this.asset, false, variant.uid, false);
-            this.largeWaveforms[variant.uid] =
-                SoundPreviewer.get(this.asset, false, variant.uid, true);
+            await sounds.addSoundFile(this.asset, source);
             this.update();
             soundResMethods.loadSound(this.asset);
         };

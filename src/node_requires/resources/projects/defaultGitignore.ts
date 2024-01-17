@@ -24,6 +24,8 @@ ehthumbs_vista.db
 
 # Ct.js
 *.ict.recovery
+*.ict.backup*
 prev
 trash
+splash.png
 `;

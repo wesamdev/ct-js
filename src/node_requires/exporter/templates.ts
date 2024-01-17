@@ -1,9 +1,10 @@
 import {getById} from '../resources';
 import {getUnwrappedExtends} from './utils';
-import {embedStaticBehaviors, getBehaviorsList} from './behaviors';
+import {embedStaticBehaviors, getBehaviorsList, unwrapBehaviorFields} from './behaviors';
 import {getTextureShape} from './textures';
 
 import {getBaseScripts} from './scriptableProcessor';
+import {ExporterError} from './ExporterError';
 
 interface IBlankTexture {
     uid: string;
@@ -14,7 +15,21 @@ interface IBlankTexture {
     shape: any;
 }
 
+const requiresTextures: TemplateBaseClass[] = ['Button', 'NineSlicePlane', 'RepeatingTexture', 'SpritedCounter'];
+
+// eslint-disable-next-line complexity
 const getBaseClassInfo = (blankTextures: IBlankTexture[], template: ITemplate) => {
+    if (requiresTextures.includes(template.baseClass) &&
+        (template.texture === -1 || !template.texture)) {
+        const errorMessage = `The template ${template.name} has a base class ${template.baseClass} and thus requires a texture to be set.`;
+        const exporterError = new ExporterError(errorMessage, {
+            resourceId: template.uid,
+            resourceName: template.name,
+            resourceType: 'template',
+            clue: 'noTemplateTexture'
+        });
+        throw exporterError;
+    }
     if (template.baseClass !== 'Text') {
         let classInfo = '';
         const blankTexture = blankTextures.find(tex => tex.uid === template.texture);
@@ -25,6 +40,8 @@ const getBaseClassInfo = (blankTextures: IBlankTexture[], template: ITemplate) =
             width: ${blankTexture.width},`;
         } else if (template.texture !== -1) {
             classInfo = `texture: "${getById('texture', template.texture).name}",`;
+        } else {
+            classInfo = 'texture: -1,';
         }
         if (template.baseClass === 'NineSlicePlane' || template.baseClass === 'Button') {
             classInfo += `
@@ -45,10 +62,17 @@ const getBaseClassInfo = (blankTextures: IBlankTexture[], template: ITemplate) =
             }
             classInfo += `defaultText: ${JSON.stringify(template.defaultText)},`;
         }
+        if (template.baseClass === 'RepeatingTexture') {
+            classInfo += `scrollX: ${template.tilingSettings.scrollSpeedX},
+            scrollY: ${template.tilingSettings.scrollSpeedY},
+            isUi: ${template.tilingSettings.isUi},`;
+        } else if (template.baseClass === 'SpritedCounter') {
+            classInfo += `spriteCount: ${template.repeaterSettings.defaultCount},`;
+        }
         return classInfo;
     }
     if (template.baseClass === 'Text') {
-        if (template.textStyle === -1) {
+        if (template.textStyle === -1 || !template.textStyle) {
             return `defaultText: ${JSON.stringify(template.defaultText)},`;
         }
         return `textStyle: "${getById('style', template.textStyle).name}",
@@ -101,7 +125,7 @@ templates.templates["${template.name}"] = {
     onCreate: function () {
         ${scripts.thisOnCreate}
     },
-    extends: ${template.extends ? JSON.stringify(getUnwrappedExtends(template.extends), null, 4) : '{}'}
+    extends: ${template.extends ? JSON.stringify(unwrapBehaviorFields(template, getUnwrappedExtends(template.extends)), null, 4) : '{}'}
 };
 templates.list['${template.name.replace(/'/g, '\\\'')}'] = [];
         `;

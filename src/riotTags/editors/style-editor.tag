@@ -129,7 +129,7 @@ style-editor.aPanel.aView(class="{opts.class}")
                             use(xlink:href="#copy")
                         span {voc.copyCode}
                 textarea.wide(disabled="true" ref="codeField")
-                    | this.textLabel = new PIXI.Text('Your text here', ct.styles.get('{asset.name}'));
+                    | this.textLabel = new PIXI.Text('Your text here', styles.get('{asset.name}'));
                     | {'\n'}this.addChild(this.textLabel);
 
             button.wide.nogrow.noshrink(onclick="{styleSave}" title="Shift+Control+S" data-hotkey="Control+S")
@@ -186,6 +186,11 @@ style-editor.aPanel.aView(class="{opts.class}")
             this.labelMultiline.y = 60 * 3;
             this.labelLong.y = 60 * 6;
             this.refreshStyleTexture();
+        });
+        this.on('unmount', () => {
+            this.pixiApp.destroy(false, {
+                children: true
+            });
         });
         this.on('updated', () => {
             this.refreshStyleTexture();

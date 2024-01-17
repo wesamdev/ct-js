@@ -12,6 +12,7 @@
 import type {sound as pixiSound, filters as pixiSoundFilters, Filter, IMediaInstance, PlayOptions, Sound, SoundLibrary} from 'node_modules/@pixi/sound';
 import type {webaudio} from 'node_modules/@pixi/sound/lib';
 import type {ExportedSound} from '../node_requires/exporter/_exporterContracts';
+import type {Camera} from 'camera';
 
 import type * as pixiMod from 'node_modules/pixi.js';
 declare var PIXI: typeof pixiMod & {
@@ -19,6 +20,37 @@ declare var PIXI: typeof pixiMod & {
         filters: typeof pixiSoundFilters;
     }
 };
+declare var camera: Camera;
+
+/* eslint-disable no-underscore-dangle */
+class PannerFilter extends PIXI.sound.filters.Filter {
+    private _panner: PannerNode;
+    constructor(refDistance: number, rolloffFactor: number) {
+        const {audioContext} = PIXI.sound.context;
+        const panner = audioContext.createPanner();
+        panner.panningModel = 'equalpower';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = refDistance;
+        panner.rolloffFactor = rolloffFactor;
+        const destination = panner;
+        super(destination);
+        this._panner = panner;
+    }
+    reposition(tracked: {x: number, y: number, kill?: boolean}): void {
+        if (tracked.kill) {
+            return;
+        }
+        this._panner.positionX.value = tracked.x / camera.referenceLength;
+        this._panner.positionY.value = tracked.y / camera.referenceLength;
+    }
+    destroy() {
+        super.destroy();
+        this._panner = null;
+    }
+}
+/* eslint-enable no-underscore-dangle */
+
+export const pannedSounds = new Map<{x: number, y: number}, PannerFilter>();
 
 // ⚠️ DO NOT put into res.ts, see the start of the file.
 export const exportedSounds = [/*!@sounds@*/][0] as ExportedSound[] ?? [];
@@ -56,21 +88,23 @@ const randomRange = (min: number, max: number): number => Math.random() * (max -
  * Applies a method onto a sound — regardless whether it is a sound exported from ct.IDE
  * (with variants) or imported by a user though `res.loadSound`.
  */
-const withSound = <T>(name: string, fn: (sound: Sound) => T): T => {
+const withSound = <T>(name: string, fn: (sound: Sound, assetName: string) => T): T => {
     const pixiFind = PIXI.sound.exists(name) && PIXI.sound.find(name);
     if (pixiFind) {
-        return fn(pixiFind);
+        return fn(pixiFind, name);
     }
     if (name in pixiSoundInstances) {
-        return fn(pixiSoundInstances[name]);
-    } else if (name in soundMap) {
-        for (const variant of soundMap[name].variants) {
-            return fn(pixiSoundInstances[`${pixiSoundPrefix}${variant.uid}`]);
-        }
-    } else {
-        throw new Error(`[sounds] Sound "${name}" was not found. Is it a typo?`);
+        return fn(pixiSoundInstances[name], name);
     }
-    return null;
+    if (name in soundMap) {
+        let lastVal: T;
+        for (const variant of soundMap[name].variants) {
+            const assetName = `${pixiSoundPrefix}${variant.uid}`;
+            lastVal = fn(pixiSoundInstances[assetName], assetName);
+        }
+        return lastVal;
+    }
+    throw new Error(`[sounds] Sound "${name}" was not found. Is it a typo?`);
 };
 
 /**
@@ -150,11 +184,21 @@ export const soundsLib = {
      * @returns {Promise<string>} A promise that resolves into the name of the loaded sound asset.
      */
     async load(name: string): Promise<string> {
-        const key = `${pixiSoundPrefix}${name}`;
-        if (!PIXI.Assets.cache.has(key)) {
-            throw new Error(`[sounds.load] Sound "${name}" was not found. Is it a typo? Did you mean to use res.loadSound instead?`);
-        }
-        await PIXI.Assets.load<Sound>(key);
+        const promises = [];
+        withSound(name, (soundRes, resName) => {
+            const s = PIXI.sound.play(resName, {
+                muted: true
+            });
+            if (s instanceof Promise) {
+                promises.push(s);
+                s.then(i => {
+                    i.stop();
+                });
+            } else {
+                s.stop();
+            }
+        });
+        await Promise.all(promises);
         return name;
     },
 
@@ -186,6 +230,32 @@ export const soundsLib = {
             return pixiSoundInstances[name].play(options);
         }
         throw new Error(`[sounds.play] Sound "${name}" was not found. Is it a typo?`);
+    },
+    playAt(
+        name: string,
+        position: {x: number, y: number},
+        options?: PlayOptions
+    ): Promise<IMediaInstance> | IMediaInstance {
+        const sound = soundsLib.play(name, options);
+        const {panning} = soundMap[name];
+        if (sound instanceof Promise) {
+            sound.then(instance => {
+                soundsLib.addPannerFilter(
+                    instance as webaudio.WebAudioInstance,
+                    position,
+                    panning.refDistance,
+                    panning.rolloffFactor
+                );
+            });
+        } else {
+            soundsLib.addPannerFilter(
+                sound as webaudio.WebAudioInstance,
+                position,
+                panning.refDistance,
+                panning.rolloffFactor
+            );
+        }
+        return sound;
     },
 
     /**
@@ -475,6 +545,28 @@ export const soundsLib = {
     ): pixiSoundFilters.StereoFilter {
         const fx = new PIXI.sound.filters.StereoFilter(pan);
         soundsLib.addFilter(sound, fx, 'StereoFilter');
+        return fx;
+    },
+
+    /**
+     * Adds a 3D sound filter.
+     * This filter can only be applied to sound instances.
+     *
+     * @param sound The sound to apply effect to.
+     * @param position Any object with x and y properties — for example, copies.
+     */
+    addPannerFilter(
+        sound: webaudio.WebAudioInstance,
+        position: {x: number, y: number},
+        refDistance: number,
+        rolloffFactor: number
+    ): PannerFilter {
+        const fx = new PannerFilter(refDistance, rolloffFactor);
+        soundsLib.addFilter(sound, fx, 'PannerFilter');
+        pannedSounds.set(position, fx);
+        sound.on('end', () => {
+            pannedSounds.delete(position);
+        });
         return fx;
     },
 

@@ -483,9 +483,15 @@ export const assetContextMenuItems: IAssetContextItem[] = [{
         collection: folderEntries,
         folder: IAssetFolder
     ): Promise<void> => {
-        const template = await createAsset('template', folder, asset.name);
-        template.texture = asset.uid;
-        template.name = asset.name;
+        if (getOfType('template').some(t => t.name === asset.name)) {
+            const template = await createAsset('template', folder);
+            template.texture = asset.uid;
+        } else {
+            const template = await createAsset('template', folder, {
+                name: asset.name
+            });
+            template.texture = asset.uid;
+        }
     }
 }];
 
@@ -509,6 +515,15 @@ Promise<ITexture> => {
         src: inputPath
     });
 };
+
+// Used in exporter/textures to skip atlas packaging when no textures were changed.
+const markForTextureGeneration = () => {
+    sessionStorage.canSkipTextureGeneration = 'no';
+};
+window.signals.on('textureCreated', markForTextureGeneration);
+window.signals.on('textureRemoved', markForTextureGeneration);
+window.signals.on('textureChanged', markForTextureGeneration);
+window.signals.on('resetAll', markForTextureGeneration);
 
 export {
     clearPixiTextureCache,
